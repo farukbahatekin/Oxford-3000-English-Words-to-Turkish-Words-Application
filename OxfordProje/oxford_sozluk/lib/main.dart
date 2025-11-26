@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 void main() {
-  // Durum çubuğunu şeffaf ve modern yapıyoruz
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
@@ -24,9 +23,9 @@ class OxfordApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4F46E5), // Modern İndigo
-          secondary: const Color(0xFFF97316), // Canlı Turuncu
-          background: const Color(0xFFF3F4F6), // Hafif Gri Arka Plan
+          seedColor: const Color(0xFF4F46E5),
+          secondary: const Color(0xFFF97316),
+          background: const Color(0xFFF3F4F6),
         ),
         scaffoldBackgroundColor: const Color(0xFFF3F4F6),
         fontFamily: 'Roboto', 
@@ -54,7 +53,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   bool isLoading = true;
   int currentDay = 1;
   
-  // TEST İÇİN BUNU DÜŞÜK TUTABİLİRSİN (Örn: 2). GERÇEKTE 50 YAP.
   static const int wordsPerDay = 50; 
 
   @override
@@ -65,14 +63,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _initializeData();
   }
 
-  // Ses motorunu başlatma
   Future<void> _initTts() async {
     flutterTts = FlutterTts();
     await flutterTts.setPitch(1.0);
     await flutterTts.setSpeechRate(0.5);
   }
 
-  // Dili seçip konuşma fonksiyonu (lang: "en-US" veya "de-DE")
   Future<void> _speak(String text, String lang) async {
     await flutterTts.stop();
     if (text.isNotEmpty) {
@@ -102,7 +98,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
-  // Günü bitirip sonraki seviyeye geçme
   Future<void> _advanceDay() async {
     bool confirm = await showDialog(
       context: context, 
@@ -134,14 +129,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           SnackBar(
             content: Text("Harika! $currentDay. Güne hoş geldin."), 
             behavior: SnackBarBehavior.floating,
-            backgroundColor: const Color(0xFF10B981), // Yeşil
+            backgroundColor: const Color(0xFF10B981),
           ),
         );
       }
     }
   }
 
-  // Önceki güne dönme
   Future<void> _previousDay() async {
     if (currentDay <= 1) return;
     final prefs = await SharedPreferences.getInstance();
@@ -152,7 +146,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     await prefs.setInt('current_day', currentDay);
   }
 
-  // Kelimeleri günlere dağıtma mantığı
   void _distributeWords() {
     int startToday = (currentDay - 1) * wordsPerDay;
     int endToday = startToday + wordsPerDay;
@@ -183,7 +176,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
 
     return Scaffold(
-      // Üst Bar Tasarımı
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -234,7 +226,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
       ),
       
-      // Alt Buton (Günü Bitir)
       floatingActionButton: Container(
         height: 65,
         width: 160,
@@ -253,7 +244,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
 
-      // Ana İçerik
       body: TabBarView(
         controller: _tabController,
         children: [
@@ -264,7 +254,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  // --- 1. SEKME: BUGÜNÜN KELİMELERİ ---
   Widget _buildTodayList() {
     if (todaysWords.isEmpty) {
       return const Center(
@@ -292,7 +281,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  // --- 2. SEKME: ARŞİV ---
   Widget _buildOldDaysList() {
     if (oldDaysMap.isEmpty) {
       return Center(
@@ -351,20 +339,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   child: Row(
                     children: [
-                      // Arşiv Kelime Metinleri
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(word['en'], style: const TextStyle(fontWeight: FontWeight.w800)),
                             Text(word['tr'], style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                            // --- ARŞİV İÇİN ALMANCA EKLEMESİ ---
                             if (word['de'] != null)
                               Text(word['de'], style: const TextStyle(color: Color(0xFFE11D48), fontSize: 12, fontStyle: FontStyle.italic)),
                           ],
                         ),
                       ),
-                      // Küçük Butonlar (Arşiv için)
                       _buildMiniSpeaker(word['en'], "en-US", const Color(0xFF4F46E5)),
                       const SizedBox(width: 8),
                       _buildMiniSpeaker(word['de'], "de-DE", const Color(0xFFE11D48)),
@@ -379,9 +364,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  // --- YARDIMCI WIDGET'LAR ---
-
-  // Büyük Kart Tasarımı
   Widget _buildFancyCard(dynamic word, int index) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -400,12 +382,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () => _speak(word['en'], "en-US"), // Karta basınca varsayılan İngilizce
+          onTap: () => _speak(word['en'], "en-US"),
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Row(
               children: [
-                // Sol taraf: Numara
                 Container(
                   width: 50,
                   height: 50,
@@ -433,12 +414,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ),
                 const SizedBox(width: 20),
                 
-                // Orta Kısım: Kelimeler
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // İNGİLİZCE
                       Text(
                         word['en'],
                         style: const TextStyle(
@@ -448,7 +427,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                       ),
                       const SizedBox(height: 4),
-                      // TÜRKÇE
                       Text(
                         word['tr'],
                         style: TextStyle(
@@ -458,12 +436,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                       ),
                       const SizedBox(height: 4),
-                      // --- ALMANCA (YENİ EKLENEN KISIM) ---
                       Text(
-                        word['de'] ?? '', // Boşsa hata vermesin
+                        word['de'] ?? '', 
                         style: const TextStyle(
                           fontSize: 15,
-                          color: Color(0xFFE11D48), // Kırmızımsı (Butonla uyumlu)
+                          color: Color(0xFFE11D48), 
                           fontWeight: FontWeight.w500,
                           fontStyle: FontStyle.italic
                         ),
@@ -472,10 +449,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   ),
                 ),
 
-                // Sağ Taraf: İki Hoparlör Butonu
                 Column(
                   children: [
-                    // Mavi Buton: İngilizce
                     InkWell(
                       onTap: () => _speak(word['en'], "en-US"),
                       borderRadius: BorderRadius.circular(20),
@@ -486,18 +461,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       ),
                     ),
                     const SizedBox(height: 10),
-                    // Kırmızı Buton: Almanca
                     InkWell(
                       onTap: () {
-                         // JSON'da 'de' verisi yoksa hata vermesin diye kontrol
-                         var deText = word['de'];
-                         if (deText != null && deText.toString().isNotEmpty) {
-                           _speak(deText, "de-DE");
-                         } else {
-                           ScaffoldMessenger.of(context).showSnackBar(
-                             const SnackBar(content: Text("Almanca ses henüz eklenmedi."), duration: Duration(milliseconds: 600))
-                           );
-                         }
+                          var deText = word['de'];
+                          if (deText != null && deText.toString().isNotEmpty) {
+                            _speak(deText, "de-DE");
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Almanca ses henüz eklenmedi."), duration: Duration(milliseconds: 600))
+                            );
+                          }
                       },
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
@@ -516,7 +489,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  // Arşivdeki küçük buton yapıcı fonksiyon
   Widget _buildMiniSpeaker(dynamic text, String lang, Color color) {
     return InkWell(
       onTap: () {
