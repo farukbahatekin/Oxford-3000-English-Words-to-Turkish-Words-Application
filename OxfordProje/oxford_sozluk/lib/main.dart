@@ -5,6 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 void main() {
+  // Durum çubuğunu şeffaf yapalım ki modern dursun
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+  ));
   runApp(const OxfordApp());
 }
 
@@ -15,13 +20,17 @@ class OxfordApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Oxford 3000',
+      title: 'OX3000',
       theme: ThemeData(
         useMaterial3: true,
+        // Ana Renk Paleti
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1A237E),
-          brightness: Brightness.light,
+          seedColor: const Color(0xFF4F46E5), // Modern İndigo
+          secondary: const Color(0xFFF97316), // Canlı Turuncu
+          background: const Color(0xFFF3F4F6), // Hafif Gri Arka Plan
         ),
+        scaffoldBackgroundColor: const Color(0xFFF3F4F6),
+        fontFamily: 'Roboto', 
       ),
       home: const HomePage(),
     );
@@ -41,8 +50,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   
   List<dynamic> allWords = [];
   List<dynamic> todaysWords = [];
-  
-  // DEĞİŞİKLİK 1: Eski kelimeleri artık "Gün Numarası -> Kelime Listesi" olarak tutuyoruz
   Map<int, List<dynamic>> oldDaysMap = {}; 
   
   bool isLoading = true;
@@ -75,25 +82,38 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final prefs = await SharedPreferences.getInstance();
     currentDay = prefs.getInt('current_day') ?? 1;
 
-    final String response = await rootBundle.loadString('assets/words.json');
-    final List<dynamic> data = json.decode(response);
+    // Hata almamak için try-catch bloğu eklenebilir ama şimdilik senin yapını koruyorum
+    try {
+      final String response = await rootBundle.loadString('assets/words.json');
+      final List<dynamic> data = json.decode(response);
 
-    setState(() {
-      allWords = data;
-      _distributeWords();
-      isLoading = false;
-    });
+      setState(() {
+        allWords = data;
+        _distributeWords();
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint("Veri yükleme hatası: $e");
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   Future<void> _advanceDay() async {
     bool confirm = await showDialog(
       context: context, 
       builder: (context) => AlertDialog(
-        title: const Text("Günü Tamamla"),
-        content: Text("$currentDay. gün bitti mi? Yeni kelimelere geçilecek."),
+        title: const Text("Tebrikler"),
+        content: Text("$currentDay. günü tamamladın mı? Yeni kelimelere geçilecek."),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Hayır")),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text("Evet, İlerle")),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Henüz Değil")),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true), 
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
+            child: const Text("Evet, Devam Et")
+          ),
         ],
       )
     ) ?? false;
@@ -106,9 +126,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       });
       await prefs.setInt('current_day', currentDay);
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("$currentDay. Güne Geçildi!"), duration: const Duration(seconds: 1)),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Harika! $currentDay. Güne hoş geldin."), 
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF10B981), // Yeşil
+          ),
+        );
+      }
     }
   }
 
@@ -122,9 +148,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     await prefs.setInt('current_day', currentDay);
   }
 
-  // DEĞİŞİKLİK 2: Kelimeleri dağıtırken eski günleri tek tek ayırıyoruz
   void _distributeWords() {
-    // 1. Bugünün kelimelerini ayarla
     int startToday = (currentDay - 1) * wordsPerDay;
     int endToday = startToday + wordsPerDay;
 
@@ -135,16 +159,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       todaysWords = []; 
     }
 
-    // 2. Eski günleri haritaya (Map) işle
     oldDaysMap.clear();
-    // 1. günden başlayıp şu anki güne kadar (şu anki gün hariç) döngü kuruyoruz
     for (int day = 1; day < currentDay; day++) {
       int start = (day - 1) * wordsPerDay;
       int end = start + wordsPerDay;
       
       if (start < allWords.length) {
         int finalEnd = end > allWords.length ? allWords.length : end;
-        // O güne ait kelimeleri listeye koyup haritaya ekliyoruz
         oldDaysMap[day] = allWords.sublist(start, finalEnd);
       }
     }
@@ -158,106 +179,179 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
         title: Column(
           children: [
-            const Text("Oxford 3000", style: TextStyle(fontWeight: FontWeight.bold)),
-            Text("$currentDay. Gün", style: TextStyle(fontSize: 14, color: Theme.of(context).primaryColor)),
+            Text(
+              "Easy to B1 with OX3000",
+              style: TextStyle(
+                fontSize: 16, 
+                fontWeight: FontWeight.w800,
+                color: Colors.grey[800],
+                letterSpacing: 0.5
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF2FF),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                "Level $currentDay",
+                style: const TextStyle(fontSize: 12, color: Color(0xFF4F46E5), fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.history),
+            icon: Icon(Icons.history_rounded, color: Colors.grey[400]),
             onPressed: _previousDay,
-            tooltip: "Önceki Güne Dön",
+            tooltip: "Geri Al",
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
+          labelColor: const Color(0xFF4F46E5),
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: const Color(0xFF4F46E5),
+          indicatorWeight: 3,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
           tabs: [
-            Tab(text: 'Çalış (${todaysWords.length})'),
-            // Tekrar sekmesinde toplam kaç gün olduğunu gösterelim
-            Tab(text: 'Tekrar (${oldDaysMap.length} Gün)'),
+            const Tab(text: 'Bugünü Çalış'), // Emoji kaldırıldı
+            Tab(text: 'Arşiv (${oldDaysMap.length})'), // Emoji kaldırıldı
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _advanceDay,
-        label: const Text("Günü Bitir"),
-        icon: const Icon(Icons.check_circle),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
+      
+      floatingActionButton: Container(
+        height: 65,
+        width: 160,
+        margin: const EdgeInsets.only(bottom: 10),
+        child: FloatingActionButton.extended(
+          onPressed: _advanceDay,
+          elevation: 4,
+          backgroundColor: const Color(0xFF4F46E5),
+          icon: const Icon(Icons.check_circle, color: Colors.white),
+          label: const Text(
+            "Günü Bitir", 
+            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        ),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+
       body: TabBarView(
         controller: _tabController,
         children: [
-          // 1. Sekme: Bugün (Aynı)
           _buildTodayList(),
-          // 2. Sekme: Eski Günler (YENİ GÖRÜNÜM)
           _buildOldDaysList(),
         ],
       ),
     );
   }
 
-  // Bugünün listesi için widget
   Widget _buildTodayList() {
     if (todaysWords.isEmpty) {
-      return const Center(child: Text("Tüm kelimeler bitti!"));
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Emojili ikon yerine daha kurumsal bir ikon
+            Icon(Icons.check_circle_outline_rounded, size: 80, color: Colors.green),
+            SizedBox(height: 20),
+            Text(
+                "Tüm kelimeler bitti!\nTebrikler.", 
+                textAlign: TextAlign.center, 
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+            ),
+          ],
+        ),
+      );
     }
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       itemCount: todaysWords.length,
       itemBuilder: (context, index) {
         final word = todaysWords[index];
-        return _buildWordCard(word, index + 1, true);
+        return _buildFancyCard(word, index + 1, isActive: true);
       },
     );
   }
 
-  // DEĞİŞİKLİK 3: Eski günleri "Accordion" (Açılır/Kapanır) liste olarak gösteriyoruz
   Widget _buildOldDaysList() {
     if (oldDaysMap.isEmpty) {
-      return const Center(child: Text("Henüz geçmiş gün yok.\nBir günü tamamladığında burada gözükecek."));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history_edu, size: 60, color: Colors.grey[300]),
+            const SizedBox(height: 10),
+            Text("Henüz geçmiş gün yok.", style: TextStyle(color: Colors.grey[500])),
+          ],
+        ),
+      );
     }
 
-    // Haritadaki günleri listeye çevirip ters çevirelim (En son gün en üstte olsun istersek reversed kullanırız)
-    // Şimdilik 1. Gün en üstte olsun:
-    var days = oldDaysMap.keys.toList(); 
+    var days = oldDaysMap.keys.toList();
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       itemCount: days.length,
       itemBuilder: (context, index) {
-        int dayNum = days[index]; // Gün numarası (örn: 1)
-        List words = oldDaysMap[dayNum]!; // O günün kelimeleri
+        int dayNum = days[index];
+        List words = oldDaysMap[dayNum]!;
 
         return Card(
+          elevation: 0,
           margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.grey.shade200)
+          ),
+          color: Colors.white,
           child: ExpansionTile(
-            // Başlık kısmı
-            leading: CircleAvatar(
-              backgroundColor: Colors.indigo.shade50,
-              child: Text("$dayNum", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo)),
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                "$dayNum", 
+                style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF4F46E5))
+              ),
             ),
             title: Text(
-              "$dayNum. Gün",
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              "$dayNum. Gün Arşivi",
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
             ),
-            subtitle: Text("${words.length} Kelime"),
-            childrenPadding: const EdgeInsets.all(0),
-            // Açılınca çıkacak kelimeler
+            subtitle: Text("${words.length} Kelime Öğrenildi"),
+            childrenPadding: EdgeInsets.zero,
             children: words.map((word) {
               return Container(
-                decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: Colors.grey.shade200))
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: Color(0xFFF3F4F6)))
                 ),
                 child: ListTile(
-                  dense: true, // Daha sıkı görünüm
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
                   title: Text(word['en'], style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(word['tr']),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.volume_up_rounded, size: 20, color: Colors.indigo),
-                    onPressed: () => _speak(word['en']),
+                  subtitle: Text(word['tr'], style: const TextStyle(color: Colors.grey)),
+                  trailing: InkWell(
+                    onTap: () => _speak(word['en']),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: const Icon(Icons.volume_up_rounded, size: 20, color: Color(0xFF4F46E5)),
+                    ),
                   ),
                 ),
               );
@@ -268,24 +362,93 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  // Tekrarlanan kart tasarımı (Temiz kod için ayırdım)
-  Widget _buildWordCard(dynamic word, int index, bool isToday) {
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.indigo.shade100,
-          child: Text("$index"),
-        ),
-        title: Text(
-          word['en'],
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        subtitle: Text(word['tr'], style: const TextStyle(fontSize: 16)),
-        trailing: IconButton(
-          icon: const Icon(Icons.volume_up_rounded, color: Colors.indigo),
-          onPressed: () => _speak(word['en']),
+  Widget _buildFancyCard(dynamic word, int index, {bool isActive = false}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => _speak(word['en']), 
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                // Numara Alanı
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4F46E5), Color(0xFF818CF8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4F46E5).withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      )
+                    ]
+                  ),
+                  child: Center(
+                    child: Text(
+                      "$index",
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                // Kelimeler
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        word['en'],
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        word['tr'],
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Ses İkonu
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: const Icon(Icons.volume_up_rounded, color: Color(0xFF4F46E5)),
+                )
+              ],
+            ),
+          ),
         ),
       ),
     );
