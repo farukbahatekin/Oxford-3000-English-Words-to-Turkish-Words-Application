@@ -41,7 +41,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   
   List<dynamic> allWords = [];
   List<dynamic> todaysWords = [];
-  List<dynamic> oldWords = [];
+  
+  // DEĞİŞİKLİK 1: Eski kelimeleri artık "Gün Numarası -> Kelime Listesi" olarak tutuyoruz
+  Map<int, List<dynamic>> oldDaysMap = {}; 
   
   bool isLoading = true;
   int currentDay = 1;
@@ -120,23 +122,31 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     await prefs.setInt('current_day', currentDay);
   }
 
+  // DEĞİŞİKLİK 2: Kelimeleri dağıtırken eski günleri tek tek ayırıyoruz
   void _distributeWords() {
-    int startIndex = (currentDay - 1) * wordsPerDay;
-    int endIndex = startIndex + wordsPerDay;
+    // 1. Bugünün kelimelerini ayarla
+    int startToday = (currentDay - 1) * wordsPerDay;
+    int endToday = startToday + wordsPerDay;
 
-    if (startIndex < allWords.length) {
-      int finalIndex = endIndex > allWords.length ? allWords.length : endIndex;
-      todaysWords = allWords.sublist(startIndex, finalIndex);
+    if (startToday < allWords.length) {
+      int finalIndex = endToday > allWords.length ? allWords.length : endToday;
+      todaysWords = allWords.sublist(startToday, finalIndex);
     } else {
       todaysWords = []; 
     }
 
-    if (startIndex > 0) {
-      int oldWordsEndIndex = startIndex > allWords.length ? allWords.length : startIndex;
-      oldWords = allWords.sublist(0, oldWordsEndIndex);
-      oldWords.shuffle();
-    } else {
-      oldWords = [];
+    // 2. Eski günleri haritaya (Map) işle
+    oldDaysMap.clear();
+    // 1. günden başlayıp şu anki güne kadar (şu anki gün hariç) döngü kuruyoruz
+    for (int day = 1; day < currentDay; day++) {
+      int start = (day - 1) * wordsPerDay;
+      int end = start + wordsPerDay;
+      
+      if (start < allWords.length) {
+        int finalEnd = end > allWords.length ? allWords.length : end;
+        // O güne ait kelimeleri listeye koyup haritaya ekliyoruz
+        oldDaysMap[day] = allWords.sublist(start, finalEnd);
+      }
     }
   }
 
@@ -165,7 +175,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           controller: _tabController,
           tabs: [
             Tab(text: 'Çalış (${todaysWords.length})'),
-            Tab(text: 'Tekrar (${oldWords.length})'),
+            // Tekrar sekmesinde toplam kaç gün olduğunu gösterelim
+            Tab(text: 'Tekrar (${oldDaysMap.length} Gün)'),
           ],
         ),
       ),
@@ -179,45 +190,104 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildWordList(todaysWords, isToday: true),
-          _buildWordList(oldWords, isToday: false),
+          // 1. Sekme: Bugün (Aynı)
+          _buildTodayList(),
+          // 2. Sekme: Eski Günler (YENİ GÖRÜNÜM)
+          _buildOldDaysList(),
         ],
       ),
     );
   }
 
-  Widget _buildWordList(List<dynamic> words, {required bool isToday}) {
-    if (words.isEmpty) {
-      return Center(child: Text(isToday ? "Tüm kelimeler bitti!" : "Henüz geçmiş kelime yok."));
+  // Bugünün listesi için widget
+  Widget _buildTodayList() {
+    if (todaysWords.isEmpty) {
+      return const Center(child: Text("Tüm kelimeler bitti!"));
     }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+      itemCount: todaysWords.length,
+      itemBuilder: (context, index) {
+        final word = todaysWords[index];
+        return _buildWordCard(word, index + 1, true);
+      },
+    );
+  }
+
+  // DEĞİŞİKLİK 3: Eski günleri "Accordion" (Açılır/Kapanır) liste olarak gösteriyoruz
+  Widget _buildOldDaysList() {
+    if (oldDaysMap.isEmpty) {
+      return const Center(child: Text("Henüz geçmiş gün yok.\nBir günü tamamladığında burada gözükecek."));
+    }
+
+    // Haritadaki günleri listeye çevirip ters çevirelim (En son gün en üstte olsun istersek reversed kullanırız)
+    // Şimdilik 1. Gün en üstte olsun:
+    var days = oldDaysMap.keys.toList(); 
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-      itemCount: words.length,
+      itemCount: days.length,
       itemBuilder: (context, index) {
-        final word = words[index];
+        int dayNum = days[index]; // Gün numarası (örn: 1)
+        List words = oldDaysMap[dayNum]!; // O günün kelimeleri
+
         return Card(
-          elevation: isToday ? 3 : 1,
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ExpansionTile(
+            // Başlık kısmı
             leading: CircleAvatar(
-              backgroundColor: isToday ? Colors.indigo.shade100 : Colors.grey.shade200,
-              child: Text("${index + 1}"),
+              backgroundColor: Colors.indigo.shade50,
+              child: Text("$dayNum", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo)),
             ),
             title: Text(
-              word['en'],
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              "$dayNum. Gün",
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            subtitle: Text(word['tr'], style: const TextStyle(fontSize: 16)),
-            trailing: IconButton(
-              icon: const Icon(Icons.volume_up_rounded, color: Colors.indigo),
-              onPressed: () {
-                _speak(word['en']);
-              },
-            ),
+            subtitle: Text("${words.length} Kelime"),
+            childrenPadding: const EdgeInsets.all(0),
+            // Açılınca çıkacak kelimeler
+            children: words.map((word) {
+              return Container(
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: Colors.grey.shade200))
+                ),
+                child: ListTile(
+                  dense: true, // Daha sıkı görünüm
+                  title: Text(word['en'], style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(word['tr']),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.volume_up_rounded, size: 20, color: Colors.indigo),
+                    onPressed: () => _speak(word['en']),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         );
       },
+    );
+  }
+
+  // Tekrarlanan kart tasarımı (Temiz kod için ayırdım)
+  Widget _buildWordCard(dynamic word, int index, bool isToday) {
+    return Card(
+      elevation: 3,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.indigo.shade100,
+          child: Text("$index"),
+        ),
+        title: Text(
+          word['en'],
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        subtitle: Text(word['tr'], style: const TextStyle(fontSize: 16)),
+        trailing: IconButton(
+          icon: const Icon(Icons.volume_up_rounded, color: Colors.indigo),
+          onPressed: () => _speak(word['en']),
+        ),
+      ),
     );
   }
 }
