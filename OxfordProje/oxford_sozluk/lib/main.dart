@@ -1,122 +1,223 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const OxfordApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class OxfordApp extends StatelessWidget {
+  const OxfordApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      debugShowCheckedModeBanner: false,
+      title: 'Oxford 3000',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1A237E),
+          brightness: Brightness.light,
+        ),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const HomePage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  late FlutterTts flutterTts;
+  
+  List<dynamic> allWords = [];
+  List<dynamic> todaysWords = [];
+  List<dynamic> oldWords = [];
+  
+  bool isLoading = true;
+  int currentDay = 1;
+  static const int wordsPerDay = 50;
 
-  void _incrementCounter() {
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _initTts();
+    _initializeData();
+  }
+
+  Future<void> _initTts() async {
+    flutterTts = FlutterTts();
+    await flutterTts.setLanguage("en-US");
+    await flutterTts.setPitch(1.0);
+    await flutterTts.setSpeechRate(0.5);
+  }
+
+  Future<void> _speak(String text) async {
+    await flutterTts.stop();
+    if (text.isNotEmpty) {
+      await flutterTts.speak(text);
+    }
+  }
+
+  Future<void> _initializeData() async {
+    final prefs = await SharedPreferences.getInstance();
+    currentDay = prefs.getInt('current_day') ?? 1;
+
+    final String response = await rootBundle.loadString('assets/words.json');
+    final List<dynamic> data = json.decode(response);
+
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      allWords = data;
+      _distributeWords();
+      isLoading = false;
     });
+  }
+
+  Future<void> _advanceDay() async {
+    bool confirm = await showDialog(
+      context: context, 
+      builder: (context) => AlertDialog(
+        title: const Text("Günü Tamamla"),
+        content: Text("$currentDay. gün bitti mi? Yeni kelimelere geçilecek."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Hayır")),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text("Evet, İlerle")),
+        ],
+      )
+    ) ?? false;
+
+    if (confirm) {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        currentDay++;
+        _distributeWords();
+      });
+      await prefs.setInt('current_day', currentDay);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("$currentDay. Güne Geçildi!"), duration: const Duration(seconds: 1)),
+      );
+    }
+  }
+
+  Future<void> _previousDay() async {
+    if (currentDay <= 1) return;
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      currentDay--;
+      _distributeWords();
+    });
+    await prefs.setInt('current_day', currentDay);
+  }
+
+  void _distributeWords() {
+    int startIndex = (currentDay - 1) * wordsPerDay;
+    int endIndex = startIndex + wordsPerDay;
+
+    if (startIndex < allWords.length) {
+      int finalIndex = endIndex > allWords.length ? allWords.length : endIndex;
+      todaysWords = allWords.sublist(startIndex, finalIndex);
+    } else {
+      todaysWords = []; 
+    }
+
+    if (startIndex > 0) {
+      int oldWordsEndIndex = startIndex > allWords.length ? allWords.length : startIndex;
+      oldWords = allWords.sublist(0, oldWordsEndIndex);
+      oldWords.shuffle();
+    } else {
+      oldWords = [];
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
+        title: Column(
           children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
+            const Text("Oxford 3000", style: TextStyle(fontWeight: FontWeight.bold)),
+            Text("$currentDay. Gün", style: TextStyle(fontSize: 14, color: Theme.of(context).primaryColor)),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: _previousDay,
+            tooltip: "Önceki Güne Dön",
+          ),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: [
+            Tab(text: 'Çalış (${todaysWords.length})'),
+            Tab(text: 'Tekrar (${oldWords.length})'),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _advanceDay,
+        label: const Text("Günü Bitir"),
+        icon: const Icon(Icons.check_circle),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
       ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildWordList(todaysWords, isToday: true),
+          _buildWordList(oldWords, isToday: false),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWordList(List<dynamic> words, {required bool isToday}) {
+    if (words.isEmpty) {
+      return Center(child: Text(isToday ? "Tüm kelimeler bitti!" : "Henüz geçmiş kelime yok."));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+      itemCount: words.length,
+      itemBuilder: (context, index) {
+        final word = words[index];
+        return Card(
+          elevation: isToday ? 3 : 1,
+          margin: const EdgeInsets.only(bottom: 10),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: isToday ? Colors.indigo.shade100 : Colors.grey.shade200,
+              child: Text("${index + 1}"),
+            ),
+            title: Text(
+              word['en'],
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            subtitle: Text(word['tr'], style: const TextStyle(fontSize: 16)),
+            trailing: IconButton(
+              icon: const Icon(Icons.volume_up_rounded, color: Colors.indigo),
+              onPressed: () {
+                _speak(word['en']);
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }
