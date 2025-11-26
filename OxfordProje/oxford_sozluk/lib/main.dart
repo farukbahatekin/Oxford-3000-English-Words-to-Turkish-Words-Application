@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 void main() {
-  // Durum çubuğunu şeffaf yapalım ki modern dursun
+  // Durum çubuğunu şeffaf ve modern yapıyoruz
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
@@ -23,7 +23,6 @@ class OxfordApp extends StatelessWidget {
       title: 'OX3000',
       theme: ThemeData(
         useMaterial3: true,
-        // Ana Renk Paleti
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF4F46E5), // Modern İndigo
           secondary: const Color(0xFFF97316), // Canlı Turuncu
@@ -54,7 +53,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   
   bool isLoading = true;
   int currentDay = 1;
-  static const int wordsPerDay = 50;
+  
+  // TEST İÇİN BUNU DÜŞÜK TUTABİLİRSİN (Örn: 2). GERÇEKTE 50 YAP.
+  static const int wordsPerDay = 50; 
 
   @override
   void initState() {
@@ -64,16 +65,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _initializeData();
   }
 
+  // Ses motorunu başlatma
   Future<void> _initTts() async {
     flutterTts = FlutterTts();
-    await flutterTts.setLanguage("en-US");
     await flutterTts.setPitch(1.0);
     await flutterTts.setSpeechRate(0.5);
   }
 
-  Future<void> _speak(String text) async {
+  // Dili seçip konuşma fonksiyonu (lang: "en-US" veya "de-DE")
+  Future<void> _speak(String text, String lang) async {
     await flutterTts.stop();
     if (text.isNotEmpty) {
+      await flutterTts.setLanguage(lang);
       await flutterTts.speak(text);
     }
   }
@@ -82,7 +85,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final prefs = await SharedPreferences.getInstance();
     currentDay = prefs.getInt('current_day') ?? 1;
 
-    // Hata almamak için try-catch bloğu eklenebilir ama şimdilik senin yapını koruyorum
     try {
       final String response = await rootBundle.loadString('assets/words.json');
       final List<dynamic> data = json.decode(response);
@@ -100,6 +102,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
+  // Günü bitirip sonraki seviyeye geçme
   Future<void> _advanceDay() async {
     bool confirm = await showDialog(
       context: context, 
@@ -138,6 +141,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
+  // Önceki güne dönme
   Future<void> _previousDay() async {
     if (currentDay <= 1) return;
     final prefs = await SharedPreferences.getInstance();
@@ -148,6 +152,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     await prefs.setInt('current_day', currentDay);
   }
 
+  // Kelimeleri günlere dağıtma mantığı
   void _distributeWords() {
     int startToday = (currentDay - 1) * wordsPerDay;
     int endToday = startToday + wordsPerDay;
@@ -178,6 +183,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
 
     return Scaffold(
+      // Üst Bar Tasarımı
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -185,7 +191,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         title: Column(
           children: [
             Text(
-              "Easy to B1 with OX3000",
+              "Easy to B1 (EN-TR-DE)",
               style: TextStyle(
                 fontSize: 16, 
                 fontWeight: FontWeight.w800,
@@ -222,12 +228,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           indicatorWeight: 3,
           labelStyle: const TextStyle(fontWeight: FontWeight.bold),
           tabs: [
-            const Tab(text: 'Bugünü Çalış'), // Emoji kaldırıldı
-            Tab(text: 'Arşiv (${oldDaysMap.length})'), // Emoji kaldırıldı
+            const Tab(text: 'Bugünü Çalış'),
+            Tab(text: 'Arşiv (${oldDaysMap.length})'),
           ],
         ),
       ),
       
+      // Alt Buton (Günü Bitir)
       floatingActionButton: Container(
         height: 65,
         width: 160,
@@ -246,6 +253,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
 
+      // Ana İçerik
       body: TabBarView(
         controller: _tabController,
         children: [
@@ -256,13 +264,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
+  // --- 1. SEKME: BUGÜNÜN KELİMELERİ ---
   Widget _buildTodayList() {
     if (todaysWords.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Emojili ikon yerine daha kurumsal bir ikon
             Icon(Icons.check_circle_outline_rounded, size: 80, color: Colors.green),
             SizedBox(height: 20),
             Text(
@@ -279,11 +287,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       itemCount: todaysWords.length,
       itemBuilder: (context, index) {
         final word = todaysWords[index];
-        return _buildFancyCard(word, index + 1, isActive: true);
+        return _buildFancyCard(word, index + 1);
       },
     );
   }
 
+  // --- 2. SEKME: ARŞİV ---
   Widget _buildOldDaysList() {
     if (oldDaysMap.isEmpty) {
       return Center(
@@ -338,20 +347,28 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 decoration: const BoxDecoration(
                   border: Border(top: BorderSide(color: Color(0xFFF3F4F6)))
                 ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
-                  title: Text(word['en'], style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(word['tr'], style: const TextStyle(color: Colors.grey)),
-                  trailing: InkWell(
-                    onTap: () => _speak(word['en']),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEEF2FF),
-                        borderRadius: BorderRadius.circular(30),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Row(
+                    children: [
+                      // Arşiv Kelime Metinleri
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(word['en'], style: const TextStyle(fontWeight: FontWeight.w800)),
+                            Text(word['tr'], style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                            // --- ARŞİV İÇİN ALMANCA EKLEMESİ ---
+                            if (word['de'] != null)
+                              Text(word['de'], style: const TextStyle(color: Color(0xFFE11D48), fontSize: 12, fontStyle: FontStyle.italic)),
+                          ],
+                        ),
                       ),
-                      child: const Icon(Icons.volume_up_rounded, size: 20, color: Color(0xFF4F46E5)),
-                    ),
+                      // Küçük Butonlar (Arşiv için)
+                      _buildMiniSpeaker(word['en'], "en-US", const Color(0xFF4F46E5)),
+                      const SizedBox(width: 8),
+                      _buildMiniSpeaker(word['de'], "de-DE", const Color(0xFFE11D48)),
+                    ],
                   ),
                 ),
               );
@@ -362,7 +379,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _buildFancyCard(dynamic word, int index, {bool isActive = false}) {
+  // --- YARDIMCI WIDGET'LAR ---
+
+  // Büyük Kart Tasarımı
+  Widget _buildFancyCard(dynamic word, int index) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -380,12 +400,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () => _speak(word['en']), 
+          onTap: () => _speak(word['en'], "en-US"), // Karta basınca varsayılan İngilizce
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Row(
               children: [
-                // Numara Alanı
+                // Sol taraf: Numara
                 Container(
                   width: 50,
                   height: 50,
@@ -412,11 +432,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   ),
                 ),
                 const SizedBox(width: 20),
-                // Kelimeler
+                
+                // Orta Kısım: Kelimeler
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // İNGİLİZCE
                       Text(
                         word['en'],
                         style: const TextStyle(
@@ -426,6 +448,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                       ),
                       const SizedBox(height: 4),
+                      // TÜRKÇE
                       Text(
                         word['tr'],
                         style: TextStyle(
@@ -434,22 +457,80 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           fontWeight: FontWeight.w500
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      // --- ALMANCA (YENİ EKLENEN KISIM) ---
+                      Text(
+                        word['de'] ?? '', // Boşsa hata vermesin
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFFE11D48), // Kırmızımsı (Butonla uyumlu)
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.italic
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                // Ses İkonu
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(50),
-                  ),
-                  child: const Icon(Icons.volume_up_rounded, color: Color(0xFF4F46E5)),
+
+                // Sağ Taraf: İki Hoparlör Butonu
+                Column(
+                  children: [
+                    // Mavi Buton: İngilizce
+                    InkWell(
+                      onTap: () => _speak(word['en'], "en-US"),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(20)),
+                        child: const Icon(Icons.volume_up_rounded, color: Color(0xFF4F46E5), size: 24),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Kırmızı Buton: Almanca
+                    InkWell(
+                      onTap: () {
+                         // JSON'da 'de' verisi yoksa hata vermesin diye kontrol
+                         var deText = word['de'];
+                         if (deText != null && deText.toString().isNotEmpty) {
+                           _speak(deText, "de-DE");
+                         } else {
+                           ScaffoldMessenger.of(context).showSnackBar(
+                             const SnackBar(content: Text("Almanca ses henüz eklenmedi."), duration: Duration(milliseconds: 600))
+                           );
+                         }
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: const Color(0xFFFFF1F2), borderRadius: BorderRadius.circular(20)),
+                        child: const Icon(Icons.volume_up_rounded, color: Color(0xFFE11D48), size: 24),
+                      ),
+                    ),
+                  ],
                 )
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // Arşivdeki küçük buton yapıcı fonksiyon
+  Widget _buildMiniSpeaker(dynamic text, String lang, Color color) {
+    return InkWell(
+      onTap: () {
+        if (text != null && text.toString().isNotEmpty) {
+          _speak(text, lang);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text("$lang sesi yok."), duration: const Duration(milliseconds: 500))
+          );
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(4.0),
+        child: Icon(Icons.volume_up_rounded, color: color, size: 22),
       ),
     );
   }
